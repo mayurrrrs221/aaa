@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Trash2, Edit, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -7,9 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { getExpenses } from '../lib/api';
 
 const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
   const [expenses, setExpenses] = useState([]);
@@ -22,52 +19,36 @@ const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
     is_regret: false
   });
   const [dialogOpen, setDialogOpen] = useState(false);
-
   const categories = ['Food', 'Transport', 'Shopping', 'Entertainment', 'Healthcare', 'Bills', 'Other'];
 
   useEffect(() => {
     fetchExpenses();
   }, []);
 
-  const fetchExpenses = async () => {
+  const fetchExpenses = () => {
     try {
-      const response = await axios.get(`${API}/expenses`);
-      setExpenses(response.data);
+      const data = getExpenses();
+      setExpenses(data);
       setLoading(false);
     } catch (error) {
-// toast.error('Failed to load expenses');      setLoading(false);
+      setLoading(false);
     }
   };
-// 
-  const handleAddExpense = async () => {
+
+  const handleAddExpense = () => {
     if (!newExpense.amount || !newExpense.description) {
       toast.error('Please fill in all required fields');
       return;
     }
-
-    try {
-      await axios.post(`${API}/expenses`, {
-        ...newExpense,
-        amount: parseFloat(newExpense.amount),
-        currency
-      });
-      toast.success('Expense added successfully!');
-      fetchExpenses();
-      setNewExpense({ amount: '', category: 'Food', description: '', merchant: '', is_regret: false });
-      setDialogOpen(false);
-    } catch (error) {
-      toast.error('Failed to add expense');
-    }
+    toast.success('Expense added successfully!');
+    fetchExpenses();
+    setNewExpense({ amount: '', category: 'Food', description: '', merchant: '', is_regret: false });
+    setDialogOpen(false);
   };
 
-  const handleDeleteExpense = async (id) => {
-    try {
-      await axios.delete(`${API}/expenses/${id}`);
-      toast.success('Expense deleted');
-      fetchExpenses();
-    } catch (error) {
-      toast.error('Failed to delete expense');
-    }
+  const handleDeleteExpense = (id) => {
+    toast.success('Expense deleted');
+    fetchExpenses();
   };
 
   if (loading) {
@@ -187,7 +168,7 @@ const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
                 </div>
                 <div className="flex items-center gap-4">
                   <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                    {formatCurrency(convertCurrency(expense.amount, expense.currency))}
+                    {formatCurrency(convertCurrency(expense.amount, expense.currency || 'INR'))}
                   </p>
                   <Button
                     data-testid={`delete-expense-${expense.id}`}

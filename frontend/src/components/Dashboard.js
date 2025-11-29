@@ -4,38 +4,36 @@ import { Wallet, TrendingUp, TrendingDown, DollarSign, Mic, Camera } from 'lucid
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
-import { getDashboard, getTrends } from '../lib/api';
 
 const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
-  const [analytics, setAnalytics] = useState(null);
-  const [trends, setTrends] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Mock data directly
+  const [analytics] = useState({
+    income: 50000,
+    expenses: 25000,
+    savings: 25000,
+    categories: [
+      { name: 'Food', value: 5000 },
+      { name: 'Transport', value: 3000 },
+      { name: 'Entertainment', value: 2000 },
+      { name: 'Shopping', value: 8000 },
+      { name: 'Bills', value: 7000 }
+    ],
+    topExpenses: [
+      { id: 1, category: 'Food', description: 'Groceries', amount: 500 },
+      { id: 2, category: 'Transport', description: 'Uber ride', amount: 200 },
+      { id: 3, category: 'Entertainment', description: 'Movie tickets', amount: 300 }
+    ]
+  });
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
-
-  const fetchDashboard = async () => {
-    try {
-      const analyticsData = getDashboard();
-      const trendsData = getTrends();
-      setAnalytics(analyticsData);
-      setTrends(trendsData);
-      setLoading(false);
-    } catch (error) {
-      setLoading(false);
-    }
-  };
-
-  if (loading || !analytics) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  const [trends] = useState([
+    { day: 'Mon', amount: 800 },
+    { day: 'Tue', amount: 1200 },
+    { day: 'Wed', amount: 950 },
+    { day: 'Thu', amount: 1100 },
+    { day: 'Fri', amount: 1500 },
+    { day: 'Sat', amount: 2000 },
+    { day: 'Sun', amount: 1300 }
+  ]);
 
   const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 

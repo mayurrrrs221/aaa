@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react';
-import { Trash2, Edit, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-import { getExpenses } from '../lib/api';
 
 const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
-  const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [expenses] = useState([
+    { id: 1, description: 'Coffee', amount: 150, category: 'Food', merchant: 'Cafe', date: new Date().toISOString(), currency: 'INR', is_regret: false },
+    { id: 2, description: 'Uber ride', amount: 200, category: 'Transport', merchant: 'Uber', date: new Date().toISOString(), currency: 'INR', is_regret: false },
+    { id: 3, description: 'Movie ticket', amount: 300, category: 'Entertainment', merchant: 'PVR Cinema', date: new Date().toISOString(), currency: 'INR', is_regret: false }
+  ]);
+  
   const [newExpense, setNewExpense] = useState({
     amount: '',
     category: 'Food',
@@ -21,43 +24,19 @@ const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const categories = ['Food', 'Transport', 'Shopping', 'Entertainment', 'Healthcare', 'Bills', 'Other'];
 
-  useEffect(() => {
-    fetchExpenses();
-  }, []);
-
-  const fetchExpenses = () => {
-    try {
-      const data = getExpenses();
-      setExpenses(data);
-      setLoading(false);
-    } catch (error) {
-      setLoading(false);
-    }
-  };
-
   const handleAddExpense = () => {
     if (!newExpense.amount || !newExpense.description) {
       toast.error('Please fill in all required fields');
       return;
     }
     toast.success('Expense added successfully!');
-    fetchExpenses();
     setNewExpense({ amount: '', category: 'Food', description: '', merchant: '', is_regret: false });
     setDialogOpen(false);
   };
 
   const handleDeleteExpense = (id) => {
     toast.success('Expense deleted');
-    fetchExpenses();
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-8" data-testid="expenses-page">

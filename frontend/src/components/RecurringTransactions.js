@@ -1,219 +1,208 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Plus, Repeat, Trash2 } from 'lucide-react';
+import { Plus, Repeat, Trash2, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
 const RecurringTransactions = ({ currency, formatCurrency }) => {
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [recurring, setRecurring] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
-    name: '',
+    description: '',
     amount: '',
-    category: 'Bills',
-    transaction_type: 'expense',
-    recurring_date: '1'
+    frequency: 'monthly',
+    nextDue: '',
+    category: 'Bills'
   });
 
-  const categories = ['Bills', 'Subscriptions', 'Rent', 'Salary', 'Investment', 'Other'];
+  const frequencies = ['weekly', 'bi-weekly', 'monthly', 'quarterly', 'yearly'];
+  const categories = ['Bills', 'Subscriptions', 'Salary', 'Rent', 'Insurance', 'Maintenance', 'Other'];
 
+  // Load data from localStorage on mount
   useEffect(() => {
-    fetchTransactions();
+    const loaded = JSON.parse(localStorage.getItem('recurring') || '[]');
+    setRecurring(loaded);
   }, []);
 
-  const fetchTransactions = async () => {
-    try {
-      const response = await axios.get(`${API}/recurring-transactions`);
-      setTransactions(response.data);
-      setLoading(false);
-    } catch (error) {
-      toast.error('Failed to load recurring transactions');
-      setLoading(false);
-    }
-  };
+  // Save to localStorage when data changes
+  useEffect(() => {
+    localStorage.setItem('recurring', JSON.stringify(recurring));
+  }, [recurring]);
 
-  const handleAddTransaction = async () => {
-    if (!newTransaction.name || !newTransaction.amount) {
+  const handleAddTransaction = () => {
+    if (!newTransaction.description || !newTransaction.amount || !newTransaction.nextDue) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    try {
-      await axios.post(`${API}/recurring-transactions`, {
-        ...newTransaction,
-        amount: parseFloat(newTransaction.amount),
-        recurring_date: parseInt(newTransaction.recurring_date),
-        currency
-      });
-      toast.success('Recurring transaction added!');
-      fetchTransactions();
-      setNewTransaction({ name: '', amount: '', category: 'Bills', transaction_type: 'expense', recurring_date: '1' });
-      setDialogOpen(false);
-    } catch (error) {
-      toast.error('Failed to add transaction');
-    }
+    const transaction = {
+      id: Date.now(),
+      description: newTransaction.description,
+      amount: parseFloat(newTransaction.amount),
+      frequency: newTransaction.frequency,
+      nextDue: newTransaction.nextDue,
+      category: newTransaction.category,
+      createdAt: new Date().toISOString()
+    };
+
+    setRecurring([...recurring, transaction]);
+    toast.success('Recurring transaction added!');
+    setNewTransaction({ description: '', amount: '', frequency: 'monthly', nextDue: '', category: 'Bills' });
+    setDialogOpen(false);
   };
 
-  const processRecurring = async () => {
-    try {
-      const response = await axios.post(`${API}/recurring-transactions/process`);
-      if (response.data.count > 0) {
-        toast.success(`Processed ${response.data.count} recurring transactions!`);
-      } else {
-        toast.info('No transactions due today');
-      }
-    } catch (error) {
-      toast.error('Failed to process recurring transactions');
-    }
+  const handleDeleteTransaction = (id) => {
+    setRecurring(recurring.filter(t => t.id !== id));
+    toast.success('Recurring transaction deleted');
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  const getNextOccurrence = (frequency, baseDate) => {
+    const date = new Date(baseDate);
+    switch(frequency) {
+      case 'weekly':
+        date.setDate(date.getDate() + 7);
+        break;
+      case 'bi-weekly':
+        date.setDate(date.getDate() + 14);
+        break;
+      case 'monthly':
+        date.setMonth(date.getMonth() + 1);
+        break;
+      case 'quarterly':
+        date.setMonth(date.getMonth() + 3);
+        break;
+      case 'yearly':
+        date.setFullYear(date.getFullYear() + 1);
+        break;
+      default:
+        return baseDate;
+    }
+    return date.toISOString().split('T')[0];
+  };
+
+  const totalMonthly = recurring
+    .filter(t => ['weekly', 'monthly', 'bi-weekly'].includes(t.frequency))
+    .reduce((sum, t) => {
+      const multiplier = t.frequency === 'weekly' ? 4.33 : t.frequency === 'bi-weekly' ? 2.17 : 1;
+      return sum + (t.amount * multiplier);
+    }, 0);
+
+  const totalYearly = totalMonthly * 12;
 
   return (
-    <div className="p-8" data-testid="recurring-page">
+    <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-4xl font-bold gradient-text">Recurring Transactions</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">Auto-add monthly bills and income</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Manage your recurring payments and income</p>
         </div>
-        
-        <div className="flex gap-3">
-          <Button 
-            data-testid="process-recurring-btn"
-            onClick={processRecurring}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
-          >
-            <Repeat className="mr-2" size={18} />
-            Process Now
-          </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="add-recurring-btn" className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg">
-                <Plus className="mr-2" size={18} />
-                Add Recurring
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg">
+              <Plus className="mr-2" size={18} />
+              Add Recurring
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Recurring Transaction</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Input
+                placeholder="Description (e.g., Netflix Subscription)"
+                value={newTransaction.description}
+                onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+              />
+              <Input
+                type="number"
+                placeholder="Amount"
+                value={newTransaction.amount}
+                onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+              />
+              <Select value={newTransaction.frequency} onValueChange={(value) => setNewTransaction({ ...newTransaction, frequency: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {frequencies.map(freq => (
+                    <SelectItem key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={newTransaction.category} onValueChange={(value) => setNewTransaction({ ...newTransaction, category: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="date"
+                value={newTransaction.nextDue}
+                onChange={(e) => setNewTransaction({ ...newTransaction, nextDue: e.target.value })}
+              />
+              <Button onClick={handleAddTransaction} className="w-full bg-blue-500 hover:bg-blue-600">
+                Add Transaction
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Recurring Transaction</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input
-                  data-testid="recurring-name"
-                  placeholder="Name (e.g., Netflix, Rent)"
-                  value={newTransaction.name}
-                  onChange={(e) => setNewTransaction({ ...newTransaction, name: e.target.value })}
-                />
-                <Input
-                  data-testid="recurring-amount"
-                  type="number"
-                  placeholder="Amount"
-                  value={newTransaction.amount}
-                  onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                />
-                <Select 
-                  value={newTransaction.transaction_type} 
-                  onValueChange={(value) => setNewTransaction({ ...newTransaction, transaction_type: value })}
-                >
-                  <SelectTrigger data-testid="recurring-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="expense">Expense</SelectItem>
-                    <SelectItem value="income">Income</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select 
-                  value={newTransaction.category} 
-                  onValueChange={(value) => setNewTransaction({ ...newTransaction, category: value })}
-                >
-                  <SelectTrigger data-testid="recurring-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  data-testid="recurring-date"
-                  type="number"
-                  min="1"
-                  max="31"
-                  placeholder="Day of Month (1-31)"
-                  value={newTransaction.recurring_date}
-                  onChange={(e) => setNewTransaction({ ...newTransaction, recurring_date: e.target.value })}
-                />
-                <Button 
-                  data-testid="submit-recurring"
-                  onClick={handleAddTransaction} 
-                  className="w-full bg-purple-500 hover:bg-purple-600"
-                >
-                  Add Transaction
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="glass-effect rounded-2xl p-6 shadow-lg">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">Estimated Monthly</p>
+          <p className="text-4xl font-bold mt-2 text-blue-600">{formatCurrency(totalMonthly)}</p>
+        </div>
+        <div className="glass-effect rounded-2xl p-6 shadow-lg">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">Estimated Yearly</p>
+          <p className="text-4xl font-bold mt-2 text-green-600">{formatCurrency(totalYearly)}</p>
         </div>
       </div>
 
-      <div className="glass-effect rounded-2xl p-6 shadow-lg">
-        <div className="space-y-4">
-          {transactions.length === 0 ? (
-            <p className="text-center text-gray-500 dark:text-gray-400 py-8">No recurring transactions yet. Add your first one!</p>
-          ) : (
-            transactions.map((transaction) => (
-              <div 
-                key={transaction.id} 
-                data-testid={`recurring-item-${transaction.id}`}
-                className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl hover:shadow-md transition-shadow"
-              >
+      <div className="space-y-4">
+        {recurring.length === 0 ? (
+          <div className="glass-effect rounded-2xl p-12 shadow-lg text-center">
+            <Repeat className="mx-auto mb-4 text-gray-400" size={48} />
+            <p className="text-gray-500 dark:text-gray-400 text-lg">No recurring transactions yet. Add one to get started!</p>
+          </div>
+        ) : (
+          recurring.map((transaction) => (
+            <div key={transaction.id} className="glass-effect rounded-2xl p-6 shadow-lg">
+              <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-bold text-lg text-gray-800 dark:text-gray-200">{transaction.name}</h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      transaction.transaction_type === 'income' 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                        : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                    }`}>
-                      {transaction.transaction_type}
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">{transaction.description}</h3>
+                  <div className="flex gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Repeat size={14} /> {transaction.frequency}
                     </span>
-                    <span className="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 text-xs rounded-full">
-                      {transaction.category}
+                    <span className="flex items-center gap-1">
+                      <Calendar size={14} /> Due: {new Date(transaction.nextDue).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                    Repeats on day {transaction.recurring_date} of every month
-                  </p>
-                  {transaction.last_processed && (
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      Last processed: {new Date(transaction.last_processed).toLocaleDateString()}
-                    </p>
-                  )}
                 </div>
-                <div className="flex items-center gap-4">
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                    {formatCurrency(transaction.amount)}
-                  </p>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(transaction.amount)}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{transaction.category}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteTransaction(transaction.id)}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900 mt-2"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

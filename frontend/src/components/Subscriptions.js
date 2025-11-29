@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Plus, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -7,12 +7,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const Subscriptions = ({ currency, formatCurrency }) => {
-  const [subscriptions] = useState([
-    { id: 1, name: 'Netflix', amount: 500, category: 'Entertainment', billing_cycle: 'monthly', status: 'active' },
-    { id: 2, name: 'Spotify', amount: 299, category: 'Entertainment', billing_cycle: 'monthly', status: 'active' },
-    { id: 3, name: 'YouTube Premium', amount: 129, category: 'Entertainment', billing_cycle: 'monthly', status: 'active' }
-  ]);
-  
+  const [subscriptions, setSubscriptions] = useState([]);
   const [newSubscription, setNewSubscription] = useState({
     name: '',
     category: 'Entertainment',
@@ -24,17 +19,43 @@ const Subscriptions = ({ currency, formatCurrency }) => {
   const categories = ['Entertainment', 'Productivity', 'Finance', 'Health', 'Education', 'Other'];
   const billing_cycles = ['daily', 'weekly', 'monthly', 'yearly'];
 
+  // Load from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('subscriptions');
+    if (saved) {
+      try {
+        setSubscriptions(JSON.parse(saved));
+      } catch (error) {
+        console.error('Error loading subscriptions:', error);
+      }
+    }
+  }, []);
+
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem('subscriptions', JSON.stringify(subscriptions));
+  }, [subscriptions]);
+
   const handleAddSubscription = () => {
     if (!newSubscription.name || !newSubscription.amount) {
-      toast.error('Please fill in all required fields');
+      toast.error('Please fill in all fields');
       return;
     }
-    toast.success('Subscription added successfully!');
+
+    const subToAdd = {
+      id: Date.now(),
+      ...newSubscription,
+      amount: parseFloat(newSubscription.amount)
+    };
+
+    setSubscriptions([...subscriptions, subToAdd]);
+    toast.success('Subscription added!');
     setNewSubscription({ name: '', category: 'Entertainment', amount: '', billing_cycle: 'monthly', status: 'active' });
     setDialogOpen(false);
   };
 
   const handleDeleteSubscription = (id) => {
+    setSubscriptions(subscriptions.filter(s => s.id !== id));
     toast.success('Subscription deleted');
   };
 
@@ -62,16 +83,12 @@ const Subscriptions = ({ currency, formatCurrency }) => {
             </DialogHeader>
             <div className="space-y-4">
               <Input
-                data-testid="subscription-name"
                 placeholder="Subscription Name"
                 value={newSubscription.name}
                 onChange={(e) => setNewSubscription({ ...newSubscription, name: e.target.value })}
               />
-              <Select 
-                value={newSubscription.category} 
-                onValueChange={(value) => setNewSubscription({ ...newSubscription, category: value })}
-              >
-                <SelectTrigger data-testid="subscription-category">
+              <Select value={newSubscription.category} onValueChange={(value) => setNewSubscription({ ...newSubscription, category: value })}>
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -81,17 +98,13 @@ const Subscriptions = ({ currency, formatCurrency }) => {
                 </SelectContent>
               </Select>
               <Input
-                data-testid="subscription-amount"
                 type="number"
                 placeholder="Amount"
                 value={newSubscription.amount}
                 onChange={(e) => setNewSubscription({ ...newSubscription, amount: e.target.value })}
               />
-              <Select 
-                value={newSubscription.billing_cycle} 
-                onValueChange={(value) => setNewSubscription({ ...newSubscription, billing_cycle: value })}
-              >
-                <SelectTrigger data-testid="subscription-billing">
+              <Select value={newSubscription.billing_cycle} onValueChange={(value) => setNewSubscription({ ...newSubscription, billing_cycle: value })}>
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -100,11 +113,7 @@ const Subscriptions = ({ currency, formatCurrency }) => {
                   ))}
                 </SelectContent>
               </Select>
-              <Button 
-                data-testid="submit-subscription"
-                onClick={handleAddSubscription} 
-                className="w-full bg-blue-500 hover:bg-blue-600"
-              >
+              <Button onClick={handleAddSubscription} className="w-full bg-blue-500 hover:bg-blue-600">
                 Add Subscription
               </Button>
             </div>
@@ -129,16 +138,12 @@ const Subscriptions = ({ currency, formatCurrency }) => {
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <AlertCircle className="mx-auto mb-4 text-gray-400" size={48} />
-                <p className="text-gray-500 dark:text-gray-400">No subscriptions yet. Add your first one!</p>
+                <p className="text-gray-500 dark:text-gray-400">No subscriptions. Add your first one!</p>
               </div>
             </div>
           ) : (
             subscriptions.map((subscription) => (
-              <div 
-                key={subscription.id} 
-                data-testid={`subscription-item-${subscription.id}`}
-                className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl hover:shadow-md transition-shadow"
-              >
+              <div key={subscription.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl hover:shadow-md transition-shadow">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-bold text-lg text-gray-800 dark:text-gray-200">{subscription.name}</h3>
@@ -152,16 +157,8 @@ const Subscriptions = ({ currency, formatCurrency }) => {
                   <p className="text-sm text-gray-500 dark:text-gray-400">{subscription.category} • {subscription.billing_cycle}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                    {formatCurrency(subscription.amount)}
-                  </p>
-                  <Button
-                    data-testid={`delete-subscription-${subscription.id}`}
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteSubscription(subscription.id)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
-                  >
+                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">{formatCurrency(subscription.amount)}</p>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteSubscription(subscription.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900">
                     <Trash2 size={18} />
                   </Button>
                 </div>

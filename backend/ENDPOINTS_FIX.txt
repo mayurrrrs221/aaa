@@ -1,0 +1,67 @@
+=== FINOTE BACKEND FIX GUIDE ===
+
+ROOT CAUSE: All 8 broken endpoints fail because they call await db.*.find() without try/except wrapping.
+When MongoDB queries fail/timeout, they crash instead of returning graceful errors.
+Error message: "Failed to get data"
+
+=== UNIVERSAL FIX PATTERN ===
+
+Wrap EACH endpoint's database call in try/except:
+
+try:
+    data = await db.collection.find({...}, {"_id": 0}).to_list(1000)
+    if not data:
+        data = []
+    return {"success": True, "data": data}
+except Exception as e:
+    logging.error(f"Error: {str(e)}")
+    return {"success": False, "error": "Failed to get data", "data": []}
+
+=== 8 BROKEN ENDPOINTS TO FIX ===
+
+1. Line ~870: @api_router.get("/leaderboard") - get_leaderboard()
+   FIX: Wrap lines 877-878 (db.expenses.find, db.income.find) in try/except
+   Return fallback: {"leaderboard": []}
+
+2. Line ~1010: @api_router.get("/reports/weekly") - generate_weekly_report()
+   FIX: Wrap all db.*.find() calls in try/except
+   Return fallback empty report structure
+
+3. Line ~850: @api_router.get("/analytics/behaviour") - get_behaviour_analytics()
+   FIX: Wrap db.expenses.find() in try/except
+   Return fallback: {"patterns": {}, "alerts": []}
+
+4. Line ~1090: @api_router.get("/analytics/category/{category}") - get_category_insights()
+   FIX: Wrap db.expenses.find() in try/except
+   Return fallback: {"category": category, "total_spent": 0, ...}
+
+5. Line ~1110: @api_router.get("/analytics/merchants") - get_merchant_insights()
+   FIX: Wrap db.expenses.find() in try/except
+   Return fallback: {"merchants": []}
+
+6. Line ~1150: @api_router.get("/badges") - get_badges()
+   FIX: Wrap db.badges.find() in try/except
+   Return fallback: {"badges": []}
+
+7. Line ~1130: @api_router.get("/recommendations") - get_lifestyle_recommendations()
+   FIX: Wrap db.expenses.find() and db.subscriptions.find() in try/except
+   Return fallback: {"recommendations": []}
+
+8. Line ~870: @api_router.post("/ai-twin/chat") - ai_twin_chat()
+   FIX: Wrap all db.*.find() calls in try/except
+   Return fallback: {"response": "AI service temporarily unavailable"}
+
+=== QUICK FIX STEPS ===
+
+1. Clone repo locally: git clone https://github.com/mayurrrrs221/aaa.git
+2. Open backend/server.py in VS Code
+3. For each of the 8 endpoints above:
+   - Find the function
+   - Wrap database .find() calls in try/except
+   - Add proper error response in except block
+4. Save and commit: git add . && git commit -m "Fix: Add error handling to 8 API endpoints"
+5. Push: git push → Railway auto-redeploys
+
+=== IMPLEMENTATION TIME ===
+Estimated: 30 minutes for all 8 endpoints
+Result: All broken endpoints will return graceful error responses instead of crashing

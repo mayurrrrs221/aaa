@@ -35,11 +35,10 @@ const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
       setExpenses(response.data);
       setLoading(false);
     } catch (error) {
-      toast.error('Failed to load expenses');
-      setLoading(false);
+// toast.error('Failed to load expenses');      setLoading(false);
     }
   };
-
+// 
   const handleAddExpense = async () => {
     if (!newExpense.amount || !newExpense.description) {
       toast.error('Please fill in all required fields');

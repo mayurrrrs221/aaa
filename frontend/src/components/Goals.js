@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -6,32 +6,50 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from './ui/input';
 
 const Goals = ({ currency, formatCurrency }) => {
-  const [goals] = useState([
-    { id: 1, title: 'Emergency Fund', target_amount: 100000, current_amount: 45000, category: 'Savings', target_date: '2024-12-31' },
-    { id: 2, title: 'Vacation Fund', target_amount: 50000, current_amount: 15000, category: 'Travel', target_date: '2024-06-30' },
-    { id: 3, title: 'New Laptop', target_amount: 100000, current_amount: 60000, category: 'Electronics', target_date: '2024-05-31' }
-  ]);
-  
+  const [goals, setGoals] = useState([]);
   const [newGoal, setNewGoal] = useState({
     title: '',
-    target_amount: '',
-    current_amount: 0,
+    targetAmount: '',
+    currentAmount: 0,
     category: 'Savings',
-    target_date: ''
+    targetDate: ''
   });
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const loadedGoals = JSON.parse(localStorage.getItem('goals') || '[]');
+    setGoals(loadedGoals);
+  }, []);
+
+  // Save to localStorage when goals change
+  useEffect(() => {
+    localStorage.setItem('goals', JSON.stringify(goals));
+  }, [goals]);
+
   const handleAddGoal = () => {
-    if (!newGoal.title || !newGoal.target_amount) {
+    if (!newGoal.title || !newGoal.targetAmount) {
       toast.error('Please fill in all required fields');
       return;
     }
+
+    const goal = {
+      id: Date.now(),
+      title: newGoal.title,
+      targetAmount: parseFloat(newGoal.targetAmount),
+      currentAmount: parseFloat(newGoal.currentAmount) || 0,
+      category: newGoal.category,
+      targetDate: newGoal.targetDate
+    };
+
+    setGoals([...goals, goal]);
     toast.success('Goal created successfully!');
-    setNewGoal({ title: '', target_amount: '', current_amount: 0, category: 'Savings', target_date: '' });
+    setNewGoal({ title: '', targetAmount: '', currentAmount: 0, category: 'Savings', targetDate: '' });
     setDialogOpen(false);
   };
 
   const handleDeleteGoal = (id) => {
+    setGoals(goals.filter(goal => goal.id !== id));
     toast.success('Goal deleted');
   };
 
@@ -39,8 +57,8 @@ const Goals = ({ currency, formatCurrency }) => {
     return Math.min((current / target) * 100, 100);
   };
 
-  const totalTarget = goals.reduce((sum, goal) => sum + (goal.target_amount || 0), 0);
-  const totalSaved = goals.reduce((sum, goal) => sum + (goal.current_amount || 0), 0);
+  const totalTarget = goals.reduce((sum, goal) => sum + (goal.targetAmount || 0), 0);
+  const totalSaved = goals.reduce((sum, goal) => sum + (goal.currentAmount || 0), 0);
 
   return (
     <div className="p-8" data-testid="goals-page">
@@ -49,7 +67,7 @@ const Goals = ({ currency, formatCurrency }) => {
           <h1 className="text-4xl font-bold gradient-text">Financial Goals</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Set and track your financial objectives</p>
         </div>
-        
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg">
@@ -72,25 +90,25 @@ const Goals = ({ currency, formatCurrency }) => {
                 data-testid="goal-target"
                 type="number"
                 placeholder="Target Amount"
-                value={newGoal.target_amount}
-                onChange={(e) => setNewGoal({ ...newGoal, target_amount: e.target.value })}
+                value={newGoal.targetAmount}
+                onChange={(e) => setNewGoal({ ...newGoal, targetAmount: e.target.value })}
               />
               <Input
                 data-testid="goal-current"
                 type="number"
                 placeholder="Current Amount"
-                value={newGoal.current_amount}
-                onChange={(e) => setNewGoal({ ...newGoal, current_amount: e.target.value })}
+                value={newGoal.currentAmount}
+                onChange={(e) => setNewGoal({ ...newGoal, currentAmount: e.target.value })}
               />
               <Input
                 data-testid="goal-date"
                 type="date"
-                value={newGoal.target_date}
-                onChange={(e) => setNewGoal({ ...newGoal, target_date: e.target.value })}
+                value={newGoal.targetDate}
+                onChange={(e) => setNewGoal({ ...newGoal, targetDate: e.target.value })}
               />
-              <Button 
+              <Button
                 data-testid="submit-goal"
-                onClick={handleAddGoal} 
+                onClick={handleAddGoal}
                 className="w-full bg-blue-500 hover:bg-blue-600"
               >
                 Create Goal
@@ -127,10 +145,10 @@ const Goals = ({ currency, formatCurrency }) => {
           </div>
         ) : (
           goals.map((goal) => {
-            const percentage = getProgressPercentage(goal.current_amount, goal.target_amount);
+            const percentage = getProgressPercentage(goal.currentAmount, goal.targetAmount);
             return (
-              <div 
-                key={goal.id} 
+              <div
+                key={goal.id}
                 data-testid={`goal-item-${goal.id}`}
                 className="glass-effect rounded-2xl p-6 shadow-lg"
               >
@@ -138,7 +156,7 @@ const Goals = ({ currency, formatCurrency }) => {
                   <div className="flex-1">
                     <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200">{goal.title}</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Target Date: {goal.target_date ? new Date(goal.target_date).toLocaleDateString() : 'Not set'}
+                      Target Date: {goal.targetDate ? new Date(goal.targetDate).toLocaleDateString() : 'Not set'}
                     </p>
                   </div>
                   <Button
@@ -151,24 +169,22 @@ const Goals = ({ currency, formatCurrency }) => {
                     <Trash2 size={20} />
                   </Button>
                 </div>
-
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Current</p>
-                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(goal.current_amount)}</p>
+                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(goal.currentAmount)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Target</p>
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(goal.target_amount)}</p>
+                    <p className="text-2xl font-bold text-green-600">{formatCurrency(goal.targetAmount)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Progress</p>
                     <p className="text-2xl font-bold text-purple-600">{percentage.toFixed(1)}%</p>
                   </div>
                 </div>
-
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                  <div 
+                  <div
                     className="bg-gradient-to-r from-blue-500 to-purple-600 h-full transition-all duration-500 rounded-full"
                     style={{ width: `${percentage}%` }}
                   />

@@ -6,34 +6,95 @@ import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 
 const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
-  // Mock data directly
-  const [analytics] = useState({
-    income: 50000,
-    expenses: 25000,
-    savings: 25000,
-    categories: [
-      { name: 'Food', value: 5000 },
-      { name: 'Transport', value: 3000 },
-      { name: 'Entertainment', value: 2000 },
-      { name: 'Shopping', value: 8000 },
-      { name: 'Bills', value: 7000 }
-    ],
-    topExpenses: [
-      { id: 1, category: 'Food', description: 'Groceries', amount: 500 },
-      { id: 2, category: 'Transport', description: 'Uber ride', amount: 200 },
-      { id: 3, category: 'Entertainment', description: 'Movie tickets', amount: 300 }
-    ]
+  const [expenses, setExpenses] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    income: 0,
+    expenses: 0,
+    savings: 0,
+    categories: [],
+    topExpenses: []
   });
+  const [trends, setTrends] = useState([]);
 
-  const [trends] = useState([
-    { day: 'Mon', amount: 800 },
-    { day: 'Tue', amount: 1200 },
-    { day: 'Wed', amount: 950 },
-    { day: 'Thu', amount: 1100 },
-    { day: 'Fri', amount: 1500 },
-    { day: 'Sat', amount: 2000 },
-    { day: 'Sun', amount: 1300 }
-  ]);
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const loadedExpenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+    const loadedSubscriptions = JSON.parse(localStorage.getItem('subscriptions') || '[]');
+    const loadedGoals = JSON.parse(localStorage.getItem('goals') || '[]');
+    
+    setExpenses(loadedExpenses);
+    setSubscriptions(loadedSubscriptions);
+    setGoals(loadedGoals);
+  }, []);
+
+  // Calculate analytics when data changes
+  useEffect(() => {
+    calculateAnalytics();
+  }, [expenses, subscriptions, goals]);
+
+  const calculateAnalytics = () => {
+    // Calculate total expenses
+    const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    
+    // Calculate total monthly subscriptions
+    const totalMonthlySubscriptions = subscriptions
+      .filter(sub => sub.billing_cycle === 'monthly')
+      .reduce((sum, sub) => sum + (sub.amount || 0), 0);
+    
+    // Calculate total yearly subscriptions (convert to monthly)
+    const totalYearlySubscriptions = subscriptions
+      .filter(sub => sub.billing_cycle === 'yearly')
+      .reduce((sum, sub) => sum + ((sub.amount || 0) / 12), 0);
+    
+    const totalSubscriptions = totalMonthlySubscriptions + totalYearlySubscriptions;
+    
+    // Assume some income (users can add goals/budgets to represent income targets)
+    const totalGoalTargets = goals.reduce((sum, goal) => sum + (goal.targetAmount || 0), 0);
+    const estimatedIncome = totalExpenses + totalSubscriptions + totalGoalTargets + 5000; // Base income estimate
+    const totalExpensesAndSubs = totalExpenses + totalSubscriptions;
+    const savings = Math.max(0, estimatedIncome - totalExpensesAndSubs);
+
+    // Calculate categories
+    const categoryMap = {};
+    expenses.forEach(expense => {
+      const category = expense.category || 'Other';
+      categoryMap[category] = (categoryMap[category] || 0) + (expense.amount || 0);
+    });
+    
+    const categories = Object.keys(categoryMap).map(name => ({
+      name,
+      value: categoryMap[name]
+    }));
+
+    // Get top 3 expenses
+    const topExpenses = [...expenses]
+      .sort((a, b) => (b.amount || 0) - (a.amount || 0))
+      .slice(0, 3);
+
+    // Calculate trends (last 7 days)
+    const trendsData = generateTrends(expenses);
+
+    setAnalytics({
+      income: estimatedIncome,
+      expenses: totalExpensesAndSubs,
+      savings,
+      categories,
+      topExpenses
+    });
+    setTrends(trendsData);
+  };
+
+  const generateTrends = (expensesList) => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days.map(day => {
+      const dayAmount = expensesList
+        .filter(exp => exp.day === day)
+        .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      return { day, amount: dayAmount || 0 };
+    });
+  };
 
   const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
@@ -88,7 +149,6 @@ const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
             </div>
           </div>
         </div>
-
         <div className="glass-effect rounded-2xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -100,7 +160,6 @@ const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
             </div>
           </div>
         </div>
-
         <div className="glass-effect rounded-2xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -112,7 +171,6 @@ const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
             </div>
           </div>
         </div>
-
         <div className="glass-effect rounded-2xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -128,7 +186,7 @@ const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <div className="lg:col-span-2 glass-effect rounded-2xl p-6 shadow-lg">
-          <h2 className="text-2xl font-bold mb-6">Spending Trends (30 Days)</h2>
+          <h2 className="text-2xl font-bold mb-6">Spending Trends (Weekly)</h2>
           {trends.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={trends}>
@@ -141,10 +199,9 @@ const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-gray-500">No trend data available</p>
+            <p className="text-gray-500">No spending data yet. Add expenses to see trends.</p>
           )}
         </div>
-
         {analytics.categories && analytics.categories.length > 0 && (
           <div className="glass-effect rounded-2xl p-6 shadow-lg">
             <h2 className="text-2xl font-bold mb-6">Expense Breakdown</h2>
@@ -177,6 +234,11 @@ const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {(!analytics.topExpenses || analytics.topExpenses.length === 0) && (
+        <div className="glass-effect rounded-2xl p-6 shadow-lg">
+          <p className="text-gray-500 text-center">No expenses yet. Go to the Expenses tab to add your first expense!</p>
         </div>
       )}
     </div>

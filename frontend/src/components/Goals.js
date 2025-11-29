@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Trash2, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
-import { Progress } from './ui/progress';
-import { getGoals } from '../lib/api';
 
 const Goals = ({ currency, formatCurrency }) => {
-  const [goals, setGoals] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [goals] = useState([
+    { id: 1, title: 'Emergency Fund', target_amount: 100000, current_amount: 45000, category: 'Savings', target_date: '2024-12-31' },
+    { id: 2, title: 'Vacation Fund', target_amount: 50000, current_amount: 15000, category: 'Travel', target_date: '2024-06-30' },
+    { id: 3, title: 'New Laptop', target_amount: 100000, current_amount: 60000, category: 'Electronics', target_date: '2024-05-31' }
+  ]);
+  
   const [newGoal, setNewGoal] = useState({
     title: '',
     target_amount: '',
@@ -19,47 +21,26 @@ const Goals = ({ currency, formatCurrency }) => {
   });
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  useEffect(() => {
-    fetchGoals();
-  }, []);
-
-  const fetchGoals = () => {
-    try {
-      const data = getGoals();
-      setGoals(data);
-      setLoading(false);
-    } catch (error) {
-      setLoading(false);
-    }
-  };
-
   const handleAddGoal = () => {
     if (!newGoal.title || !newGoal.target_amount) {
       toast.error('Please fill in all required fields');
       return;
     }
     toast.success('Goal created successfully!');
-    fetchGoals();
     setNewGoal({ title: '', target_amount: '', current_amount: 0, category: 'Savings', target_date: '' });
     setDialogOpen(false);
   };
 
   const handleDeleteGoal = (id) => {
     toast.success('Goal deleted');
-    fetchGoals();
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
 
   const getProgressPercentage = (current, target) => {
     return Math.min((current / target) * 100, 100);
   };
+
+  const totalTarget = goals.reduce((sum, goal) => sum + (goal.target_amount || 0), 0);
+  const totalSaved = goals.reduce((sum, goal) => sum + (goal.current_amount || 0), 0);
 
   return (
     <div className="p-8" data-testid="goals-page">
@@ -83,7 +64,7 @@ const Goals = ({ currency, formatCurrency }) => {
             <div className="space-y-4">
               <Input
                 data-testid="goal-title"
-                placeholder="Goal Title (e.g., Vacation Fund)"
+                placeholder="Goal Title"
                 value={newGoal.title}
                 onChange={(e) => setNewGoal({ ...newGoal, title: e.target.value })}
               />
@@ -127,13 +108,13 @@ const Goals = ({ currency, formatCurrency }) => {
         <div className="glass-effect rounded-2xl p-6 shadow-lg">
           <p className="text-gray-600 dark:text-gray-400 text-sm">Total Target</p>
           <p className="text-4xl font-bold mt-2 text-green-600">
-            {formatCurrency(goals.reduce((sum, goal) => sum + (goal.target_amount || 0), 0))}
+            {formatCurrency(totalTarget)}
           </p>
         </div>
         <div className="glass-effect rounded-2xl p-6 shadow-lg">
           <p className="text-gray-600 dark:text-gray-400 text-sm">Total Saved</p>
           <p className="text-4xl font-bold mt-2 text-purple-600">
-            {formatCurrency(goals.reduce((sum, goal) => sum + (goal.current_amount || 0), 0))}
+            {formatCurrency(totalSaved)}
           </p>
         </div>
       </div>

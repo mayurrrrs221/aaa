@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -8,12 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from './ui/checkbox';
 
 const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
-  const [expenses] = useState([
-    { id: 1, description: 'Coffee', amount: 150, category: 'Food', merchant: 'Cafe', date: new Date().toISOString(), currency: 'INR', is_regret: false },
-    { id: 2, description: 'Uber ride', amount: 200, category: 'Transport', merchant: 'Uber', date: new Date().toISOString(), currency: 'INR', is_regret: false },
-    { id: 3, description: 'Movie ticket', amount: 300, category: 'Entertainment', merchant: 'PVR Cinema', date: new Date().toISOString(), currency: 'INR', is_regret: false }
-  ]);
-  
+  const [expenses, setExpenses] = useState([]);
   const [newExpense, setNewExpense] = useState({
     amount: '',
     category: 'Food',
@@ -24,17 +19,45 @@ const Expenses = ({ currency, convertCurrency, formatCurrency }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const categories = ['Food', 'Transport', 'Shopping', 'Entertainment', 'Healthcare', 'Bills', 'Other'];
 
+  // Load expenses from localStorage on mount
+  useEffect(() => {
+    const savedExpenses = localStorage.getItem('expenses');
+    if (savedExpenses) {
+      try {
+        setExpenses(JSON.parse(savedExpenses));
+      } catch (error) {
+        console.error('Error loading expenses:', error);
+      }
+    }
+  }, []);
+
+  // Save expenses to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('expenses', JSON.stringify(expenses));
+  }, [expenses]);
+
   const handleAddExpense = () => {
     if (!newExpense.amount || !newExpense.description) {
-      toast.error('Please fill in all required fields');
+      toast.error('Please fill in amount and description');
       return;
     }
+
+    const expenseToAdd = {
+      id: Date.now(),
+      ...newExpense,
+      amount: parseFloat(newExpense.amount),
+      date: new Date().toISOString(),
+      currency: 'INR'
+    };
+
+    setExpenses([...expenses, expenseToAdd]);
     toast.success('Expense added successfully!');
     setNewExpense({ amount: '', category: 'Food', description: '', merchant: '', is_regret: false });
     setDialogOpen(false);
   };
 
   const handleDeleteExpense = (id) => {
+    setExpenses(expenses.filter(exp => exp.id !== id));
     toast.success('Expense deleted');
   };
 

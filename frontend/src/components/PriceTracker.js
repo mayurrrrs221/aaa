@@ -1,149 +1,134 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Plus, TrendingUp, TrendingDown } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const PriceTracker = ({ currency, formatCurrency }) => {
   const [trackers, setTrackers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [selectedTracker, setSelectedTracker] = useState(null);
-  const [newPrice, setNewPrice] = useState('');
   const [newTracker, setNewTracker] = useState({
-    product_name: '',
-    current_price: '',
-    target_price: '',
-    url: ''
+    productName: '',
+    currentPrice: '',
+    targetPrice: '',
+    category: 'Electronics',
+    notes: ''
   });
 
+  // Load data from localStorage on mount
   useEffect(() => {
-    fetchTrackers();
+    const loaded = JSON.parse(localStorage.getItem('priceTrackers') || '[]');
+    setTrackers(loaded);
   }, []);
 
-  const fetchTrackers = async () => {
-    try {
-      const response = await axios.get(`${API}/price-tracker`);
-      setTrackers(response.data);
-      setLoading(false);
-    } catch (error) {
-      toast.error('Failed to load price trackers');
-      setLoading(false);
-    }
-  };
+  // Save to localStorage when data changes
+  useEffect(() => {
+    localStorage.setItem('priceTrackers', JSON.stringify(trackers));
+  }, [trackers]);
 
-  const handleAddTracker = async () => {
-    if (!newTracker.product_name || !newTracker.current_price) {
-      toast.error('Please fill in required fields');
+  const handleAddTracker = () => {
+    if (!newTracker.productName || !newTracker.currentPrice) {
+      toast.error('Please fill in product name and price');
       return;
     }
 
-    try {
-      await axios.post(`${API}/price-tracker`, {
-        ...newTracker,
-        current_price: parseFloat(newTracker.current_price),
-        target_price: newTracker.target_price ? parseFloat(newTracker.target_price) : null,
-        currency
-      });
-      toast.success('Price tracker added!');
-      fetchTrackers();
-      setNewTracker({ product_name: '', current_price: '', target_price: '', url: '' });
-      setDialogOpen(false);
-    } catch (error) {
-      toast.error('Failed to add tracker');
+    const tracker = {
+      id: Date.now(),
+      productName: newTracker.productName,
+      currentPrice: parseFloat(newTracker.currentPrice),
+      targetPrice: parseFloat(newTracker.targetPrice) || null,
+      category: newTracker.category,
+      notes: newTracker.notes,
+      priceHistory: [{ date: new Date().toLocaleDateString(), price: parseFloat(newTracker.currentPrice) }],
+      createdAt: new Date().toISOString()
+    };
+
+    setTrackers([...trackers, tracker]);
+    toast.success('Price tracker added!');
+    setNewTracker({ productName: '', currentPrice: '', targetPrice: '', category: 'Electronics', notes: '' });
+    setDialogOpen(false);
+  };
+
+  const handleUpdatePrice = (id, newPrice) => {
+    setTrackers(trackers.map(t => {
+      if (t.id === id) {
+        const updatedHistory = [...(t.priceHistory || []), { date: new Date().toLocaleDateString(), price: parseFloat(newPrice) }];
+        return { ...t, currentPrice: parseFloat(newPrice), priceHistory: updatedHistory };
+      }
+      return t;
+    }));
+    toast.success('Price updated!');
+  };
+
+  const handleDeleteTracker = (id) => {
+    setTrackers(trackers.filter(t => t.id !== id));
+    toast.success('Tracker deleted');
+  };
+
+  const getPriceDifference = (tracker) => {
+    if (tracker.targetPrice) {
+      return tracker.targetPrice - tracker.currentPrice;
     }
+    return null;
   };
 
-  const handleUpdatePrice = async () => {
-    if (!newPrice || !selectedTracker) return;
-
-    try {
-      await axios.put(`${API}/price-tracker/${selectedTracker}/update-price`, {
-        new_price: parseFloat(newPrice)
-      });
-      toast.success('Price updated!');
-      fetchTrackers();
-      setNewPrice('');
-      setUpdateDialogOpen(false);
-      setSelectedTracker(null);
-    } catch (error) {
-      toast.error('Failed to update price');
+  const isPriceGood = (tracker) => {
+    if (tracker.targetPrice) {
+      return tracker.currentPrice <= tracker.targetPrice;
     }
+    return false;
   };
-
-  const getPriceTrend = (history) => {
-    if (history.length < 2) return 'stable';
-    const latest = history[history.length - 1].price;
-    const previous = history[history.length - 2].price;
-    return latest > previous ? 'up' : latest < previous ? 'down' : 'stable';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
 
   return (
-    <div className="p-8" data-testid="price-tracker-page">
+    <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-4xl font-bold gradient-text">Price Tracker</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Monitor product prices over time</p>
         </div>
-        
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="add-tracker-btn" className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg">
+            <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg">
               <Plus className="mr-2" size={18} />
-              Add Tracker
+              Add Price Tracker
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Price Tracker</DialogTitle>
+              <DialogTitle>Track Product Price</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <Input
-                data-testid="tracker-product-name"
                 placeholder="Product Name"
-                value={newTracker.product_name}
-                onChange={(e) => setNewTracker({ ...newTracker, product_name: e.target.value })}
+                value={newTracker.productName}
+                onChange={(e) => setNewTracker({ ...newTracker, productName: e.target.value })}
               />
               <Input
-                data-testid="tracker-current-price"
                 type="number"
                 placeholder="Current Price"
-                value={newTracker.current_price}
-                onChange={(e) => setNewTracker({ ...newTracker, current_price: e.target.value })}
+                value={newTracker.currentPrice}
+                onChange={(e) => setNewTracker({ ...newTracker, currentPrice: e.target.value })}
               />
               <Input
-                data-testid="tracker-target-price"
                 type="number"
-                placeholder="Target Price (optional)"
-                value={newTracker.target_price}
-                onChange={(e) => setNewTracker({ ...newTracker, target_price: e.target.value })}
+                placeholder="Target Price (when to buy)"
+                value={newTracker.targetPrice}
+                onChange={(e) => setNewTracker({ ...newTracker, targetPrice: e.target.value })}
               />
               <Input
-                data-testid="tracker-url"
-                placeholder="Product URL (optional)"
-                value={newTracker.url}
-                onChange={(e) => setNewTracker({ ...newTracker, url: e.target.value })}
+                placeholder="Category (e.g., Electronics, Books)"
+                value={newTracker.category}
+                onChange={(e) => setNewTracker({ ...newTracker, category: e.target.value })}
               />
-              <Button 
-                data-testid="submit-tracker"
-                onClick={handleAddTracker} 
-                className="w-full bg-orange-500 hover:bg-orange-600"
-              >
+              <Input
+                placeholder="Notes (optional)"
+                value={newTracker.notes}
+                onChange={(e) => setNewTracker({ ...newTracker, notes: e.target.value })}
+              />
+              <Button onClick={handleAddTracker} className="w-full bg-blue-500 hover:bg-blue-600">
                 Add Tracker
               </Button>
             </div>
@@ -151,116 +136,89 @@ const PriceTracker = ({ currency, formatCurrency }) => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-4">
         {trackers.length === 0 ? (
-          <div className="col-span-2 glass-effect rounded-2xl p-12 shadow-lg text-center">
+          <div className="glass-effect rounded-2xl p-12 shadow-lg text-center">
+            <TrendingUp className="mx-auto mb-4 text-gray-400" size={48} />
             <p className="text-gray-500 dark:text-gray-400 text-lg">No price trackers yet. Add one to start monitoring!</p>
           </div>
         ) : (
           trackers.map((tracker) => {
-            const trend = getPriceTrend(tracker.price_history);
-            const chartData = tracker.price_history.map(item => ({
-              date: new Date(item.date).toLocaleDateString(),
-              price: item.price
-            }));
-            
+            const priceDiff = getPriceDifference(tracker);
+            const isBuyTime = isPriceGood(tracker);
             return (
-              <div 
-                key={tracker.id} 
-                data-testid={`tracker-item-${tracker.id}`}
-                className="glass-effect rounded-2xl p-6 shadow-lg card-hover"
-              >
-                <div className="flex items-start justify-between mb-4">
+              <div key={tracker.id} className={`glass-effect rounded-2xl p-6 shadow-lg ${ isBuyTime ? 'border-2 border-green-500' : '' }`}>
+                <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">{tracker.product_name}</h3>
-                    {tracker.url && (
-                      <a 
-                        href={tracker.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-500 hover:underline mt-1 block"
-                      >
-                        View Product
-                      </a>
-                    )}
+                    <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200">{tracker.productName}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{tracker.category}</p>
+                    {tracker.notes && <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{tracker.notes}</p>}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {trend === 'up' && <TrendingUp className="text-red-500" size={20} />}
-                    {trend === 'down' && <TrendingDown className="text-green-500" size={20} />}
-                    <Button
-                      data-testid={`update-price-${tracker.id}`}
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTracker(tracker.id);
-                        setUpdateDialogOpen(true);
-                      }}
-                      className="bg-blue-500 hover:bg-blue-600"
-                    >
-                      Update Price
-                    </Button>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteTracker(tracker.id)}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Current Price</p>
-                    <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                      {formatCurrency(tracker.current_price)}
-                    </p>
+                    <p className="text-xl font-bold text-blue-600">{formatCurrency(tracker.currentPrice)}</p>
                   </div>
-                  {tracker.target_price && (
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Target Price</p>
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                        {formatCurrency(tracker.target_price)}
-                      </p>
-                    </div>
+                  {tracker.targetPrice && (
+                    <>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Target Price</p>
+                        <p className="text-xl font-bold text-green-600">{formatCurrency(tracker.targetPrice)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Difference</p>
+                        <p className={`text-xl font-bold ${priceDiff <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                          {priceDiff <= 0 ? '🎉 BUY NOW' : formatCurrency(priceDiff)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                        <p className={`text-lg font-bold ${isBuyTime ? 'text-green-600' : 'text-orange-600'}`}>
+                          {isBuyTime ? '✅ Good Price' : '⏳ Waiting'}
+                        </p>
+                      </div>
+                    </>
                   )}
                 </div>
-                
-                {chartData.length > 1 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Price History</h4>
-                    <ResponsiveContainer width="100%" height={150}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#64748b" />
-                        <YAxis tick={{ fontSize: 10 }} stroke="#64748b" />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="price" stroke="#f97316" strokeWidth={2} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
+
+                <div className="mt-4 flex gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Update current price..."
+                    className="flex-1"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleUpdatePrice(tracker.id, e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={(e) => {
+                      const input = e.target.previousSibling;
+                      handleUpdatePrice(tracker.id, input.value);
+                      input.value = '';
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white"
+                  >
+                    Update
+                  </Button>
+                </div>
               </div>
             );
           })
         )}
       </div>
-
-      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Price</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              data-testid="new-price-input"
-              type="number"
-              placeholder="New Price"
-              value={newPrice}
-              onChange={(e) => setNewPrice(e.target.value)}
-            />
-            <Button 
-              data-testid="submit-price-update"
-              onClick={handleUpdatePrice} 
-              className="w-full bg-blue-500 hover:bg-blue-600"
-            >
-              Update
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

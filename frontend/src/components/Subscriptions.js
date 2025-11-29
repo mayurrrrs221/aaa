@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Trash2, Plus, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { getSubscriptions } from '../lib/api';
 
 const Subscriptions = ({ currency, formatCurrency }) => {
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [totalCost, setTotalCost] = useState({ monthly_total: 0, yearly_total: 0 });
+  const [subscriptions] = useState([
+    { id: 1, name: 'Netflix', amount: 500, category: 'Entertainment', billing_cycle: 'monthly', status: 'active' },
+    { id: 2, name: 'Spotify', amount: 299, category: 'Entertainment', billing_cycle: 'monthly', status: 'active' },
+    { id: 3, name: 'YouTube Premium', amount: 129, category: 'Entertainment', billing_cycle: 'monthly', status: 'active' }
+  ]);
+  
   const [newSubscription, setNewSubscription] = useState({
     name: '',
     category: 'Entertainment',
@@ -22,46 +24,22 @@ const Subscriptions = ({ currency, formatCurrency }) => {
   const categories = ['Entertainment', 'Productivity', 'Finance', 'Health', 'Education', 'Other'];
   const billing_cycles = ['daily', 'weekly', 'monthly', 'yearly'];
 
-  useEffect(() => {
-    fetchSubscriptions();
-  }, []);
-
-  const fetchSubscriptions = () => {
-    try {
-      const data = getSubscriptions();
-      setSubscriptions(data);
-      const monthly = data.reduce((sum, sub) => sum + (sub.billing_cycle === 'monthly' ? sub.amount : 0), 0);
-      const yearly = data.reduce((sum, sub) => sum + (sub.billing_cycle === 'yearly' ? sub.amount : 0), 0);
-      setTotalCost({ monthly_total: monthly, yearly_total: yearly });
-      setLoading(false);
-    } catch (error) {
-      setLoading(false);
-    }
-  };
-
   const handleAddSubscription = () => {
     if (!newSubscription.name || !newSubscription.amount) {
       toast.error('Please fill in all required fields');
       return;
     }
     toast.success('Subscription added successfully!');
-    fetchSubscriptions();
     setNewSubscription({ name: '', category: 'Entertainment', amount: '', billing_cycle: 'monthly', status: 'active' });
     setDialogOpen(false);
   };
 
   const handleDeleteSubscription = (id) => {
     toast.success('Subscription deleted');
-    fetchSubscriptions();
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  const totalMonthly = subscriptions.reduce((sum, sub) => sum + (sub.billing_cycle === 'monthly' ? sub.amount : 0), 0);
+  const totalYearly = subscriptions.reduce((sum, sub) => sum + (sub.billing_cycle === 'yearly' ? sub.amount : 0), 0);
 
   return (
     <div className="p-8" data-testid="subscriptions-page">
@@ -85,7 +63,7 @@ const Subscriptions = ({ currency, formatCurrency }) => {
             <div className="space-y-4">
               <Input
                 data-testid="subscription-name"
-                placeholder="Subscription Name (e.g., Netflix)"
+                placeholder="Subscription Name"
                 value={newSubscription.name}
                 onChange={(e) => setNewSubscription({ ...newSubscription, name: e.target.value })}
               />
@@ -137,11 +115,11 @@ const Subscriptions = ({ currency, formatCurrency }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="glass-effect rounded-2xl p-6 shadow-lg">
           <p className="text-gray-600 dark:text-gray-400 text-sm">Monthly Cost</p>
-          <p className="text-4xl font-bold mt-2 text-blue-600">{formatCurrency(totalCost.monthly_total)}</p>
+          <p className="text-4xl font-bold mt-2 text-blue-600">{formatCurrency(totalMonthly)}</p>
         </div>
         <div className="glass-effect rounded-2xl p-6 shadow-lg">
           <p className="text-gray-600 dark:text-gray-400 text-sm">Yearly Cost</p>
-          <p className="text-4xl font-bold mt-2 text-purple-600">{formatCurrency(totalCost.yearly_total)}</p>
+          <p className="text-4xl font-bold mt-2 text-purple-600">{formatCurrency(totalYearly)}</p>
         </div>
       </div>
 

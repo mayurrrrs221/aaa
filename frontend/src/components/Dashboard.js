@@ -36,11 +36,11 @@ const Dashboard = ({ currency, convertCurrency, formatCurrency }) => {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+//       toast.error('Failed to load dashboard data');
       setLoading(false);
     }
   };
-
+// 
   const handleVoiceExpense = async () => {
     if (!voiceText.trim()) {
       toast.error('Please enter expense details');

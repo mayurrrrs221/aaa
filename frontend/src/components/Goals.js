@@ -33,8 +33,7 @@ const Goals = ({ currency, formatCurrency }) => {
       setGoals(response.data);
       setLoading(false);
     } catch (error) {
-      toast.error('Failed to load goals');
-      setLoading(false);
+// toast.error('Failed to load goals');      setLoading(false);
     }
   };
 

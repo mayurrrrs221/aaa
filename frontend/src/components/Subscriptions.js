@@ -39,8 +39,7 @@ const Subscriptions = ({ currency, formatCurrency }) => {
       setTotalCost(totalRes.data);
       setLoading(false);
     } catch (error) {
-      toast.error('Failed to load subscriptions');
-      setLoading(false);
+// toast.error('Failed to load subscriptions');      setLoading(false);
     }
   };
 
